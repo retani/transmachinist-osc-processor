@@ -1,20 +1,76 @@
 var osc = require('node-osc');
 
-var oscServer = new osc.Server(12345, '127.0.0.1'); // listen time series
-var oscServer2 = new osc.Server(12346, '127.0.0.1'); // listen fft
-var oscServer3 = new osc.Server(12347, '127.0.0.1'); // listen band power
+const confListen = {
+  "time series": {
+    port: 12345,
+    host: "127.0.0.1"
+  },
+  "fft": {
+    port: 123456,
+    host: "127.0.0.1",
+  },
+  "band power": {
+    port: 12347,
+    host: "127.0.0.1"
+  },  
+}
 
-var clientTimeSeriesLocal = new osc.Client('127.0.0.1', 6448); //send
-//var clientTimeSeriesRemote = new osc.Client('192.168.1.104', 8000); //send
+const confSend = {
+  "time series": {
+    active: false,
+    port: 8002,
+    host: "127.0.0.1"
+  },
+  "spikes": {
+    active: true,
+    port: 8001,
+    host: "127.0.0.1",
+  },
+  "adjusted bands": {
+    active: true,
+    port: 8000,
+    host: "127.0.0.1"
+  },
+}
 
-var clientSpikeLocal = new osc.Client('127.0.1.1', 8001); //send
-//var clientSpikeRemote = new osc.Client('192.168.1.104', 8001); //send
+var oscServer = new osc.Server(confListen["time series"].port, confListen["time series"].host); // listen time series
+var oscServer2 = new osc.Server(confListen["fft"].port, confListen["fft"].host); // listen fft
+var oscServer3 = new osc.Server(confListen["band power"].port, confListen["band power"].host); // listen band power
 
-var clientBandLocal = new osc.Client('127.0.0.1', 8000); //send
-//var clientBandRemote = new osc.Client('192.168.1.104', 8000); //send
+let conf = {}
+
+conf = confSend["time series"]
+if (conf.active) {
+  var clientTimeSeriesLocal = new osc.Client(conf.host, conf.port); //send
+  //var clientTimeSeriesRemote = new osc.Client('192.168.1.104', 8000); //send  
+}
+
+conf = confSend["spikes"]
+if (conf.active) {
+  var clientSpikeLocal = new osc.Client(conf.host, conf.port); //send
+  //var clientSpikeRemote = new osc.Client('192.168.1.104', 8001); //send
+}
+
+conf = confSend["adjusted bands"]
+if (conf.active) {
+  var clientBandLocal = new osc.Client(conf.host, conf.port); //send
+  //var clientBandRemote = new osc.Client('192.168.1.104', 8000); //send
+}
 
 // var clientFftMainLocal = new osc.Client('127.0.0.1', 6450); //send
 // var clientFftMainRemote = new osc.Client('192.168.5.106', 6450); //send
+
+console.log("Listening to:")
+for (let x in confListen) {
+  console.log(`  ${confListen[x].host}:${confListen[x].port} - ${x}`)
+}
+
+console.log("Sending to:")
+for (let x in confSend) {
+  console.log(`  ${confSend[x].host}:${confSend[x].port} - ${x}`)
+}
+
+console.log("")
 
 
 //const source = "/openbci"
@@ -79,7 +135,7 @@ const action = function (msg, rinfo) {
 
       previousMax = max
       makeStats("sent time series")
-      clientTimeSeriesLocal.send(target, timeSeriesOut, function () {});        
+      if (typeof clientTimeSeriesLocal != "undefined") clientTimeSeriesLocal.send(target, timeSeriesOut, function () {});        
       if (typeof clientTimeSeriesRemote != "undefined") clientTimeSeriesRemote.send(target, timeSeriesOut, function () {});             
       timeSeriesOut = 0
     }
