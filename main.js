@@ -37,6 +37,8 @@ let previousMax = 0
 const spikeThresh = 700
 const spikeMin = 685
 
+console.log("Press CTRL-C to exit")
+
 const action = function (msg, rinfo) {
 
   const sender = msg.shift()
