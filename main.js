@@ -26,6 +26,11 @@ const confSend = {
     port: 8001,
     host: "127.0.0.1",
   },
+  "headspikes": {
+    active: true,
+    port: 8003,
+    host: "127.0.0.1"
+  },
   "adjusted bands": {
     active: true,
     port: 8000,
@@ -50,6 +55,13 @@ if (conf.active) {
   var clientSpikeLocal = new osc.Client(conf.host, conf.port); //send
   //var clientSpikeRemote = new osc.Client('192.168.1.104', 8001); //send
 }
+
+conf = confSend["headspikes"]
+if (conf.active) {
+  var clientHeadSpikeLocal = new osc.Client(conf.host, conf.port); //send
+  //var clientSpikeRemote = new osc.Client('192.168.1.104', 8001); //send
+}
+
 
 conf = confSend["adjusted bands"]
 if (conf.active) {
@@ -114,8 +126,13 @@ const action = function (msg, rinfo) {
 
     timeSeriesArray[timeSeriesArrayIndex] = msg[channel-1]
 
+    avg = average(timeSeriesArray)
+    //console.log(msg[channel-1], avg)
+
+    var value = msg[channel-1]
+
     timeSeriesOut = [
-      msg[channel-1] - average(timeSeriesArray),
+      msg[channel-1] - avg,
     ]
 
     timeSeriesArrayIndex++
@@ -126,12 +143,22 @@ const action = function (msg, rinfo) {
 
       let max = timeSeriesOut[0]
       if ( max > spikeThresh && previousMax <= spikeThresh && previousMax > spikeMin) {
-        console.log("spike", max, previousMax)
+        //console.log("spike", max, previousMax)
         console.log("\007");
+        makeStats("sent hspike")
         
         clientSpikeLocal.send(target, [1], function (a,b) {});             
         if (typeof clientSpikeRemote != "undefined") clientSpikeRemote.send(target, [1], function (a,b) {});             
       }
+
+      if ( value*1.3 > avg ) { // max/2 > (avg>0 ? avg : 0) && max > 0 && avg > 0
+        //console.log("headspike", value, avg )
+        makeStats("sent headspike")
+        
+        clientHeadSpikeLocal.send(target, [1], function (a,b) {});             
+        if (typeof clientHeadSpikeLocal != "undefined") clientHeadSpikeLocal.send(target, [1], function (a,b) {});             
+      }
+
 
       previousMax = max
       makeStats("sent time series")
