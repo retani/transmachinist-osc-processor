@@ -28,7 +28,7 @@ const confSend = {
   },
   "headspikes": {
     active: true,
-    port: 8003,
+    port: 49342,
     host: "127.0.0.1"
   },
   "adjusted bands": {
@@ -49,26 +49,21 @@ let conf = {}
 conf = confSend["time series"]
 if (conf.active) {
   var clientTimeSeriesLocal = new osc.Client(conf.host, conf.port); //send
-  //var clientTimeSeriesRemote = new osc.Client('192.168.1.104', 8000); //send  
 }
 
 conf = confSend["spikes"]
 if (conf.active) {
   var clientSpikeLocal = new osc.Client(conf.host, conf.port); //send
-  //var clientSpikeRemote = new osc.Client('192.168.1.104', 8001); //send
 }
 
 conf = confSend["headspikes"]
 if (conf.active) {
   var clientHeadSpikeLocal = new osc.Client(conf.host, conf.port); //send
-  //var clientSpikeRemote = new osc.Client('192.168.1.104', 8001); //send
 }
-
 
 conf = confSend["adjusted bands"]
 if (conf.active) {
   var clientBandLocal = new osc.Client(conf.host, conf.port); //send
-  //var clientBandRemote = new osc.Client('192.168.1.104', 8000); //send
 }
 
 // var clientFftMainLocal = new osc.Client('127.0.0.1', 6450); //send
@@ -155,10 +150,12 @@ const action = function (msg, rinfo) {
 
       if ( value*1.3 > avg ) { // max/2 > (avg>0 ? avg : 0) && max > 0 && avg > 0
         //console.log("headspike", value, avg )
-        makeStats("sent headspike")
         
-        clientHeadSpikeLocal.send(target, [1], function (a,b) {});             
-        if (typeof clientHeadSpikeLocal != "undefined") clientHeadSpikeLocal.send(target, [1], function (a,b) {});             
+        if (typeof(clientHeadSpikeLocal) != "undefined") {
+          makeStats("sent headspike")
+          clientHeadSpikeLocal.send(target, [1], function (a,b) {
+          });             
+        }
       }
 
 
