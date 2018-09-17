@@ -44,6 +44,8 @@ var oscServer3 = new osc.Server(confListen["band power"].port, confListen["band 
 
 let conf = {}
 
+/**** START TRANSMISSIONS ****/
+
 conf = confSend["time series"]
 if (conf.active) {
   var clientTimeSeriesLocal = new osc.Client(conf.host, conf.port); //send
@@ -72,23 +74,14 @@ if (conf.active) {
 // var clientFftMainLocal = new osc.Client('127.0.0.1', 6450); //send
 // var clientFftMainRemote = new osc.Client('192.168.5.106', 6450); //send
 
-console.log("Listening to:")
-for (let x in confListen) {
-  console.log(`  ${confListen[x].host}:${confListen[x].port} - ${x}`)
-}
 
-console.log("Sending to:")
-for (let x in confSend) {
-  console.log(`  ${confSend[x].host}:${confSend[x].port} - ${x}`)
-}
-
-console.log("")
-
+/**** SETUP ****/
 
 //const source = "/openbci"
 const target = "/wek/inputs"
 
-const channel = 7;
+const channelOrder = [1,2,3,4,5,6,7,8];
+let channel = channelOrder[0];
 const band = [1,2,3,4,5];
 
 const timeSeriesAvgWindow = 100 // 1 sec = 250
@@ -100,12 +93,19 @@ let timeSeriesOut = 0
 let bandOut = new Array(band.length).fill(0)
 let fftMain = 0
 
+let channelActivity = {}
+let activeChannels = {}
+
+let avg = 0
+
 let previousMax = 0
 
 const spikeThresh = 700
 const spikeMin = 685
 
 console.log("Press CTRL-C to exit")
+
+/**** PROCESS INPUT ****/
 
 const action = function (msg, rinfo) {
 
@@ -127,7 +127,9 @@ const action = function (msg, rinfo) {
     timeSeriesArray[timeSeriesArrayIndex] = msg[channel-1]
 
     avg = average(timeSeriesArray)
-    //console.log(msg[channel-1], avg)
+    
+    // console.log(msg[channel-1], avg)
+    // console.log(avg)
 
     var value = msg[channel-1]
 
@@ -144,8 +146,8 @@ const action = function (msg, rinfo) {
       let max = timeSeriesOut[0]
       if ( max > spikeThresh && previousMax <= spikeThresh && previousMax > spikeMin) {
         //console.log("spike", max, previousMax)
-        console.log("\007");
-        makeStats("sent hspike")
+        // console.log("\007");
+        makeStats("sent spike")
         
         clientSpikeLocal.send(target, [1], function (a,b) {});             
         if (typeof clientSpikeRemote != "undefined") clientSpikeRemote.send(target, [1], function (a,b) {});             
@@ -172,15 +174,20 @@ const action = function (msg, rinfo) {
   if (length == 6) {
     
     makeStats("band power")
+
+    // console.log(msg)
     
     const inputChannel = msg.shift()
+
+    channelActivity[inputChannel] = (msg[0] + msg[1] + msg[2] + msg[3] + (channelActivity[inputChannel] || 0)) / 2
+
     if (inputChannel == channel) {
       for (const [index, b] of band.entries()) {
         bandOut[index] = msg[b-1]
       }
     }
 
-    if (bandOut.every( b => b!==0)) {
+    if (bandOut.every( b => b !== 0)) {
       //console.log(out)
       makeStats("sent band power")
       /*if (typeof(bandMax)=="undefined")*/ bandMax = 0
@@ -244,11 +251,72 @@ outputStats = () => {
   Object.keys(stats).sort().forEach(function(key) {
     ordered[key] = stats[key] + "/s";
   });
-  console.log(ordered)
-  stats = {}
+  console.log("stats", ordered)
+  // stats = {}
+  for (let i in stats) {
+    stats[i] = "-"
+  }
 }
 
-setInterval(outputStats, 1000)
+outputInfo = () => {
+  const info = {
+    channel
+  }
+
+  console.log("info", info)
+}
+
+outputData = () => { // output everything
+
+  process.stdout.write('\033c');
+  process.stdout.write('\x1Bc');
+
+  outputConfig()
+  console.log()
+  
+  outputInfo()
+  console.log()
+  
+  outputStats()
+
+}
+
+outputConfig = () => {
+  console.log("Listening to:")
+  for (let x in confListen) {
+    console.log(`  ${confListen[x].host}:${confListen[x].port} - ${x}`)
+  }
+  
+  console.log("Sending to:")
+  for (let x in confSend) {
+    console.log(`  ${confSend[x].host}:${confSend[x].port} - ${x}`)
+  }  
+}
+
+cycleChannel = () => {
+  if (channel < 8) channel = channel+1
+  else channel = 1
+}
+
+chooseChannel = () => {
+  for (let c in channelActivity) {
+    const value = channelActivity[c]
+    //console.log(c, value)
+    activeChannels[c] =  value > 0.2
+  }
+
+  // console.log(activeChannels)
+
+  for (let c of channelOrder) {
+    if (activeChannels[c]) {
+      channel = c;
+      break;
+    }
+  }
+}
+
+setInterval(outputData, 1000)
+setInterval(chooseChannel, 500)
+
 
 var average = arr => arr.reduce( ( p, c ) => p + c, 0 ) / arr.length;
-
